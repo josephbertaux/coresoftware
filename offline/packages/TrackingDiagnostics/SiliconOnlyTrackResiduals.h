@@ -3,8 +3,21 @@
 #ifndef SILICON_ONLY_TRACK_RESIDUALS_H
 #define SILICON_ONLY_TRACK_RESIDUALS_H
 
+#include <tpc/TpcClusterMover.h>
+#include <tpc/TpcGlobalPositionWrapper.h>
+
 #include <trackbase/ClusterErrorPara.h>
 #include <trackbase/TrkrDefs.h>
+
+#include <trackbase/ActsGeometry.h>
+#include <trackbase/ActsTrackFittingAlgorithm.h>
+#include <trackbase/TrkrDefs.h>
+
+/// Acts includes to create all necessary definitions
+#include <Acts/Definitions/Algebra.hpp>
+#include <Acts/EventData/VectorMultiTrajectory.hpp>
+#include <Acts/Utilities/BinnedArray.hpp>
+#include <Acts/Utilities/Logger.hpp>
 
 #include <fun4all/SubsysReco.h>
 
@@ -24,15 +37,12 @@ class SvtxTrack;
 class TrackSeed;
 class TrkrClusterContainer;
 class TrkrHitSetContainer;
-class PHG4TpcCylinderGeomContainer;
 class PHG4CylinderGeomContainer;
-class TpcDistortionCorrectionContainer;
 class SiliconOnlyTrackResiduals : public SubsysReco
 {
  public:
   SiliconOnlyTrackResiduals(const std::string &name = "SiliconOnlyTrackResiduals");
-
-  ~SiliconOnlyTrackResiduals() override;
+  ~SiliconOnlyTrackResiduals() override = default;
 
   int Init(PHCompositeNode *topNode) override;
   int InitRun(PHCompositeNode *topNode) override;
@@ -62,12 +72,12 @@ class SiliconOnlyTrackResiduals : public SubsysReco
                              TrkrCluster *cluster, ActsGeometry *geometry);
   void clearClusterStateVectors();
   void createBranches();
-  float convertTimeToZ (ActsGeometry *geometry, TrkrDefs::cluskey cluster_key, TrkrCluster *cluster);
   void fillEventTree (PHCompositeNode *topNode);
   void fillClusterTree (TrkrClusterContainer *clusters, ActsGeometry *geometry);
   void fillHitTree (TrkrHitSetContainer *hitmap, ActsGeometry *geometry,
-                   PHG4TpcCylinderGeomContainer *tpcGeom, PHG4CylinderGeomContainer *mvtxGeom,
-                   PHG4CylinderGeomContainer *inttGeom, PHG4CylinderGeomContainer *mmGeom);
+                   PHG4CylinderGeomContainer *mvtxGeom,
+                   PHG4CylinderGeomContainer *inttGeom
+  );
   void fillResidualTreeKF(PHCompositeNode *topNode);
   void fillResidualTreeSeeds(PHCompositeNode *topNode);
   void fillClusterBranchesKF(TrkrDefs::cluskey ckey, SvtxTrack *track,
@@ -81,8 +91,7 @@ class SiliconOnlyTrackResiduals : public SubsysReco
   void fillStatesWithCircleFit(const TrkrDefs::cluskey &key, TrkrCluster *cluster,
                                Acts::Vector3 &glob, ActsGeometry *geometry);
   void fillVertexTree(PHCompositeNode *topNode);
-  void fillFailedSeedTree(PHCompositeNode *topNode, std::set<unsigned int> &tpc_seed_ids);
-  float calc_dedx(TrackSeed *tpcseed, TrkrClusterContainer *clusters, PHG4TpcCylinderGeomContainer *tpcGeom);
+  void fillFailedSeedTree(PHCompositeNode *topNode);
 
   std::string m_outfileName = "";
   TFile *m_outfile = nullptr;
@@ -122,13 +131,7 @@ class SiliconOnlyTrackResiduals : public SubsysReco
   //! Event level quantities
   int m_nmvtx_all = std::numeric_limits<int>::quiet_NaN();
   int m_nintt_all = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpc_hits0 = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpc_hits1 = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpc_clus0 = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpc_clus1 = std::numeric_limits<int>::quiet_NaN();
-  int m_nmms_all  = std::numeric_limits<int>::quiet_NaN();
   int m_nsiseed   = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpcseed  = std::numeric_limits<int>::quiet_NaN();
   int m_ntracks_all = std::numeric_limits<int>::quiet_NaN();
 
   //! Track level quantities
@@ -137,7 +140,6 @@ class SiliconOnlyTrackResiduals : public SubsysReco
   unsigned int m_trackid = std::numeric_limits<unsigned int>::quiet_NaN();
   int m_crossing = std::numeric_limits<int>::quiet_NaN();
   int m_crossing_estimate = std::numeric_limits<int>::quiet_NaN();
-  unsigned int m_tpcid = std::numeric_limits<unsigned int>::quiet_NaN();
   unsigned int m_silid = std::numeric_limits<unsigned int>::quiet_NaN();
   float m_px = std::numeric_limits<float>::quiet_NaN();
   float m_py = std::numeric_limits<float>::quiet_NaN();
@@ -155,10 +157,6 @@ class SiliconOnlyTrackResiduals : public SubsysReco
   int m_nmapsstate = std::numeric_limits<int>::quiet_NaN();
   int m_nintt = std::numeric_limits<int>::quiet_NaN();
   int m_ninttstate = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpc = std::numeric_limits<int>::quiet_NaN();
-  int m_ntpcstate = std::numeric_limits<int>::quiet_NaN();
-  int m_nmms = std::numeric_limits<int>::quiet_NaN();
-  int m_nmmsstate = std::numeric_limits<int>::quiet_NaN();
   unsigned int m_vertexid = std::numeric_limits<unsigned int>::quiet_NaN();
   int m_vertex_crossing = std::numeric_limits<int>::quiet_NaN();
   float m_vx = std::numeric_limits<float>::quiet_NaN();
@@ -189,15 +187,6 @@ class SiliconOnlyTrackResiduals : public SubsysReco
   int m_silseedcharge = std::numeric_limits<int>::quiet_NaN();
   float m_silseedphi = std::numeric_limits<float>::quiet_NaN();
   float m_silseedeta = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedx = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedy = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedz = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedpx = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedpy = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedpz = std::numeric_limits<float>::quiet_NaN();
-  int m_tpcseedcharge = std::numeric_limits<int>::quiet_NaN();
-  float m_tpcseedphi = std::numeric_limits<float>::quiet_NaN();
-  float m_tpcseedeta = std::numeric_limits<float>::quiet_NaN();
 
   float m_dedx = std::numeric_limits<float>::quiet_NaN();
 
