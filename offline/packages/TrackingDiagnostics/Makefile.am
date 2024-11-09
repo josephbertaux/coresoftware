@@ -14,6 +14,7 @@ pkginclude_HEADERS = \
   BeamCrossingAnalysis.h \
   KshortReconstruction.h \
   helixResiduals.h \
+  SiliconOnlyTrackResiduals.h \
   TrackResiduals.h \
   TrackContainerCombiner.h \
   TrackSeedTrackMapConverter.h \
@@ -26,6 +27,7 @@ libTrackingDiagnostics_la_SOURCES = \
   BeamCrossingAnalysis.cc \
   KshortReconstruction.cc \
   helixResiduals.cc \
+  SiliconOnlyTrackResiduals.cc \
   TrackResiduals.cc \
   TrackContainerCombiner.cc \
   TrackSeedTrackMapConverter.cc \
