@@ -42,6 +42,8 @@
 #include <set>
 #include <utility>
 
+#include <boost/format.hpp>
+
 namespace
 {
   /// square
@@ -94,11 +96,18 @@ int MakeMilleFiles::InitRun(PHCompositeNode* topNode)
   if (!m_tfile_name.empty())
   {
     m_file = TFile::Open(m_tfile_name.c_str(), "RECREATE");
+
+    // Check trackreco/ActsAlignmentStates.cc:207
+    // "e.g. (d_0, z_0, phi, theta, q/p, t)"
     m_ntuple = new TNtuple (
       "ntp", "ntp",
-      "dXdR:dXdX0:dXdY0:dXdZs:dXdZ0:"
+      "layer:trkrid:xglob:yglob:zglob:"
+      "r:phi:"
+      "p:pt:eta:charge:"
+      "X_residual:Y_residual:"
+      "dXda0:dXdz0:dXdphi0:dXdtheta:dXdqp:dXdt:"
       "dXdalpha:dXdbeta:dXdgamma:dXdx:dXdy:dXdz:"
-      "dYdR:dYdX0:dYdY0:dYdZs:dYdZ0:"
+      "dYda0:dYdz0:dYdphi0:dYdtheta:dYdqp:dYdt:"
       "dYdalpha:dYdbeta:dYdgamma:dYdx:dYdy:dYdz"
     );
     m_ntuple->SetDirectory(m_file);
@@ -165,7 +174,35 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
 
     //! Make any desired track cuts here
     //! Maybe set a lower pT limit - low pT tracks are not very sensitive to alignment
-    addTrackToMilleFile(statevec);
+
+    // Require 3 MVTX states, 2 INTT states, and 0 other
+    int n_mvtx{0}, n_intt{0};
+    for (auto const& state : statevec) {
+      TrkrDefs::cluskey ckey = state->get_cluster_key();
+      const unsigned int trkr_id = TrkrDefs::getTrkrId(ckey);
+      switch (trkr_id) {
+        case TrkrDefs::mvtxId:
+          ++n_mvtx;
+          break;
+        case TrkrDefs::inttId:
+          ++n_intt;
+          break;
+      }
+    }
+
+    if (n_mvtx < m_mvtx || n_intt < m_intt) {
+        if (1 < Verbosity()) {
+            std::cout
+                << PHWHERE << "\n"
+                << "\tSkipping due to failed silicon requirements\n"
+                << "\tmvtx: " << n_mvtx << " ?= 3\n"
+                << "\tintt: " << n_intt << " ?= 2\n"
+                << std::endl;
+        }
+        continue;
+    }
+
+    addTrackToMilleFile(statevec, track);
 
     //! Only take tracks that have 2 mm within event vertex
     if (m_useEventVertex &&
@@ -462,11 +499,29 @@ Acts::Vector3 MakeMilleFiles::getEventVertex()
                        zsum / nacceptedtracks);
 }
 
-void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statevec)
+void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statevec, SvtxTrack* track)
 {
   for (auto state : statevec)
   {
     TrkrDefs::cluskey ckey = state->get_cluster_key();
+
+    if (m_silicon_only) {
+        switch (TrkrDefs::getTrkrId(ckey)) {
+        case TrkrDefs::mvtxId:
+        case TrkrDefs::inttId:
+              break; // Break this case
+        default:
+              if (1 < Verbosity()) {
+                  std::cout
+                      << PHWHERE << "\n"
+                      << "\tSkipping non-silicon cluster with key\n"
+                      << "\t" << (boost::format("0x%016x") % ckey).str() << "\n"
+                      << "\tin tracker " << (int){TrkrDefs::getTrkrId(ckey)} << "\n"
+                      << std::endl;
+              }
+              continue; // Continue enclosing for loop
+        }
+    }
 
     if (Verbosity() > 2)
     {
@@ -503,11 +558,11 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statev
     int glbl_label[SvtxAlignmentState::NGL];
     if (layer < 3)
     {
-      AlignmentDefs::getMvtxGlobalLabels(surf, glbl_label, mvtx_group);
+      AlignmentDefs::getMvtxGlobalLabels(surf, ckey, glbl_label, mvtx_group);
     }
     else if (layer > 2 && layer < 7)
     {
-      AlignmentDefs::getInttGlobalLabels(surf, glbl_label, intt_group);
+      AlignmentDefs::getInttGlobalLabels(surf, ckey, glbl_label, intt_group);
     }
     else if (layer < 55)
     {
@@ -529,6 +584,8 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statev
     /// For N residual local coordinates x, z
     for (int i = 0; i < SvtxAlignmentState::NRES; ++i)
     {
+      bool should_continue = false;
+
       // Add the measurement separately for each coordinate direction to Mille
       for (int j = 0; j < SvtxAlignmentState::NGL; ++j)
       {
@@ -570,6 +627,23 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statev
             glbl_derivative[i][j] = 0.0;
           }
         }
+
+        if (m_flip_derivatives)
+        {
+          glbl_derivative[i][j] *= -1.0;
+        }
+
+        if (!std::isfinite(glbl_derivative[i][j])) // NaN, nan, std::isnan
+        {
+          if (Verbosity())
+          {
+            std::cout
+              << PHWHERE << "\n"
+              << "\tContinuing because of non-finite global derivative\n"
+              << std::flush;
+          }
+          should_continue = true;
+        }
       }
 
       for (int j = 0; j < SvtxAlignmentState::NLOC; ++j)
@@ -580,7 +654,25 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statev
         {
           lcl_derivative[i][j] = 0.;
         }
+
+        if (m_flip_derivatives)
+        {
+          lcl_derivative[i][j] *= -1.0;
+        }
+
+        if (!std::isfinite(lcl_derivative[i][j])) // NaN, nan, std::isnan
+        {
+          if (Verbosity())
+          {
+            std::cout
+              << PHWHERE << "\n"
+              << "\tContinuing because of non-finite local derivative\n"
+              << std::flush;
+          }
+          should_continue = true;
+        }
       }
+
       if (Verbosity() > 2)
       {
         std::cout << "coordinate " << i << " has residual " << residual(i) << " and clus_sigma " << clus_sigma(i) << std::endl
@@ -603,31 +695,56 @@ void MakeMilleFiles::addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statev
         std::cout << std::endl;
       }
 
-      if (clus_sigma(i) < 1.0)  // discards crazy clusters
+      if (1.0 < clus_sigma(i))  // discards crazy clusters
       {
-        if (Verbosity() > 3)
+        if (Verbosity())
         {
-          std::cout << "ckey " << ckey << " and layer " << layer << " buffers:" << std::endl;
-          AlignmentDefs::printBuffers(i, residual, clus_sigma, lcl_derivative[i], glbl_derivative[i], glbl_label);
+          std::cout
+            << PHWHERE << "\n"
+            << "\tContinuing because of cluster size\n"
+            << std::flush;
         }
-        float errinf = 1.0;
-        if (m_layerMisalignment.find(layer) != m_layerMisalignment.end())
-        {
-          errinf = m_layerMisalignment.find(layer)->second;
-        }
-
-        _mille->mille(SvtxAlignmentState::NLOC, lcl_derivative[i], SvtxAlignmentState::NGL, glbl_derivative[i], glbl_label, residual(i), errinf * clus_sigma(i));
+        should_continue = true;
       }
+
+      if (should_continue) continue;
+
+      if (3 < Verbosity())
+      {
+        std::cout << "ckey " << ckey << " and layer " << layer << " buffers:" << std::endl;
+        AlignmentDefs::printBuffers(i, residual, clus_sigma, lcl_derivative[i], glbl_derivative[i], glbl_label);
+      }
+      float errinf = 1.0;
+      if (m_layerMisalignment.find(layer) != m_layerMisalignment.end())
+      {
+        errinf = m_layerMisalignment.find(layer)->second;
+      }
+
+      _mille->mille(SvtxAlignmentState::NLOC, lcl_derivative[i], SvtxAlignmentState::NGL, glbl_derivative[i], glbl_label, residual(i), errinf * clus_sigma(i));
     }
 
     float ntp_data[] = {
-      lcl_derivative[0][0], lcl_derivative[0][1], lcl_derivative[0][2], lcl_derivative[0][3], lcl_derivative[0][4],
+      (float)layer, (float)trkrid, (float)global(0), (float)global(1), (float)global(2),
+      (float)std::sqrt(global(0)*global(0)+global(1)*global(1)), (float)std::atan2(global(1), global(0)),
+      (float)track->get_p(), (float)track->get_pt(), (float)track->get_eta(), (float)track->get_charge(),
+      (float)residual(0), (float)residual(1),
+      lcl_derivative[0][0], lcl_derivative[0][1], lcl_derivative[0][2], lcl_derivative[0][3], lcl_derivative[0][4], lcl_derivative[0][5],
       glbl_derivative[0][0], glbl_derivative[0][1], glbl_derivative[0][2], glbl_derivative[0][3], glbl_derivative[0][4], glbl_derivative[0][5],
-      lcl_derivative[1][0], lcl_derivative[1][1], lcl_derivative[1][2], lcl_derivative[1][3], lcl_derivative[1][4],
+      lcl_derivative[1][0], lcl_derivative[1][1], lcl_derivative[1][2], lcl_derivative[1][3], lcl_derivative[1][4], lcl_derivative[1][5],
       glbl_derivative[1][0], glbl_derivative[1][1], glbl_derivative[1][2], glbl_derivative[1][3], glbl_derivative[1][4], glbl_derivative[1][5],
     };
 
-    if (m_ntuple) m_ntuple->Fill(ntp_data);
+    if (m_ntuple)
+    {
+      if (Verbosity())
+      {
+        std::cout
+          << PHWHERE << "\n"
+          << "\tFilling ntuple\n"
+          << std::flush;
+      }
+      m_ntuple->Fill(ntp_data);
+    }
   }
 
   return;

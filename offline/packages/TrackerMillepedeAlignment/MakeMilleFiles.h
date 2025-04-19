@@ -57,6 +57,11 @@ class MakeMilleFiles : public SubsysReco
   void set_datafile_name(const std::string& file) { data_outfilename = file; }
   void set_steeringfile_name(const std::string& file) { steering_outfilename = file; }
   void set_tfile_name(const std::string& file) { m_tfile_name = file; }
+  bool flip_derivatives (bool flip_derivatives = true) { return m_flip_derivatives = flip_derivatives;}
+
+  void set_minimum_mvtx(int i) {m_mvtx = i;}
+  void set_minimum_intt(int i) {m_intt = i;}
+  void set_silicon_only(bool b = true) {m_silicon_only = b;}
 
   void set_mvtx_grouping(int group) { mvtx_group = (AlignmentDefs::mvtxGrp) group; }
   void set_intt_grouping(int group) { intt_group = (AlignmentDefs::inttGrp) group; }
@@ -98,7 +103,7 @@ class MakeMilleFiles : public SubsysReco
 
   bool is_tpc_sector_fixed(unsigned int layer, unsigned int sector, unsigned int side);
   bool is_mvtx_layer_fixed(unsigned int layer, unsigned int clamshell);
-  void addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statevec);
+  void addTrackToMilleFile(SvtxAlignmentStateMap::StateVec& statevec, SvtxTrack* track);
   void getGlobalVtxDerivativesXY(SvtxTrack* track,
                                  const Acts::Vector3& vertex,
                                  float glblvtx_derivative[SvtxAlignmentState::NRES][3]);
@@ -148,6 +153,12 @@ class MakeMilleFiles : public SubsysReco
   std::string m_tfile_name;
   TFile* m_file{nullptr};
   TNtuple* m_ntuple{nullptr};
+
+  int m_mvtx{0}; // minimum required mvtx hits for "passing" tracks
+  int m_intt{0}; // minimum required intt hits for "passing" tracks
+  bool m_silicon_only{false};
+  bool m_flip_derivatives{false};
+
 };
 
 #endif  // MAKEMILLEFILES_H
