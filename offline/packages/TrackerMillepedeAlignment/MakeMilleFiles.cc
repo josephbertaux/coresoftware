@@ -172,10 +172,19 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
                 << ": Total tracks: " << _track_map->size() << ": phi: " << track->get_phi() << std::endl;
     }
 
-    //! Make any desired track cuts here
-    //! Maybe set a lower pT limit - low pT tracks are not very sensitive to alignment
+    // Require a miminum pT (lower bound is default initialized to 0)
+    if (std::abs(track->get_pt()) < m_min_pt) {
+        if (1 < Verbosity()) {
+            std::cout
+                << PHWHERE << "\n"
+                << "\tSkipping due to failed track pT requirement\n"
+                << "\ttrack pt: " << std::abs(track->get_pt()) << " (" << m_min_pt << " required)\n"
+                << std::endl;
+        }
+        continue;
+    }
 
-    // Require 3 MVTX states, 2 INTT states, and 0 other
+    // Require minimum number of MVTX, INTT clusters on track
     int n_mvtx{0}, n_intt{0};
     for (auto const& state : statevec) {
       TrkrDefs::cluskey ckey = state->get_cluster_key();
@@ -195,13 +204,13 @@ int MakeMilleFiles::process_event(PHCompositeNode* /*topNode*/)
             std::cout
                 << PHWHERE << "\n"
                 << "\tSkipping due to failed silicon requirements\n"
-                << "\tmvtx: " << n_mvtx << " ?= 3\n"
-                << "\tintt: " << n_intt << " ?= 2\n"
+                << "\tnumber of mvtx clusters: " << n_mvtx << " (" << m_mvtx << " required)\n"
+                << "\tnumber of intt clusters: " << n_intt << " (" << m_intt << " required)\n"
                 << std::endl;
         }
         continue;
     }
-
+    
     addTrackToMilleFile(statevec, track);
 
     //! Only take tracks that have 2 mm within event vertex

@@ -62,6 +62,7 @@ class MakeMilleFiles : public SubsysReco
   void set_minimum_mvtx(int i) {m_mvtx = i;}
   void set_minimum_intt(int i) {m_intt = i;}
   void set_silicon_only(bool b = true) {m_silicon_only = b;}
+  void set_min_pt(double pt) {m_min_pt = pt;}
 
   void set_mvtx_grouping(int group) { mvtx_group = (AlignmentDefs::mvtxGrp) group; }
   void set_intt_grouping(int group) { intt_group = (AlignmentDefs::inttGrp) group; }
@@ -154,10 +155,11 @@ class MakeMilleFiles : public SubsysReco
   TFile* m_file{nullptr};
   TNtuple* m_ntuple{nullptr};
 
-  int m_mvtx{0}; // minimum required mvtx hits for "passing" tracks
-  int m_intt{0}; // minimum required intt hits for "passing" tracks
+  int m_mvtx{0}; // minimum required mvtx clusters for "passing" tracks
+  int m_intt{0}; // minimum required intt clusters for "passing" tracks
   bool m_silicon_only{false};
   bool m_flip_derivatives{false};
+  double m_min_pt{0.0};
 
 };
 
