@@ -60,6 +60,10 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   void set_silicon_track_map_name(const std::string& map_name) { _silicon_track_map_name = map_name; }
   void set_track_map_name(const std::string& map_name) { _track_map_name = map_name; }
 
+  void require_state(bool b = true) {m_require_state = b;} // Require that a state exists on "SvtxAlignmentStateMap"
+  void silicon_only(bool b = true) {m_silicon_only = b;} // Only analyze tracks which comprise exactly 3 MVTX, 2 INTT clusters
+  void set_min_pt(double pt) {m_min_pt = pt;}
+
   void set_use_event_vertex(bool flag) { use_event_vertex = flag; }
   void set_datafile_name(const std::string& file) { data_outfilename = file; }
   void set_steeringfile_name(const std::string& file) { steering_outfilename = file; }
@@ -231,6 +235,10 @@ class HelicalFitter : public SubsysReco, public PHParameterInterface
   Acts::Vector3 vertexPosition;
   Acts::Vector3 vertexPosUncertainty;
   Acts::Vector2 vtx_sigma;
+
+  bool m_require_state{false};
+  bool m_silicon_only{false};
+  double m_min_pt{0.0};
 };
 
 #endif  // HELICALFITTER_H

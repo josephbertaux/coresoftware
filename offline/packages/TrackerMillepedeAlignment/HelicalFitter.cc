@@ -135,7 +135,29 @@ int HelicalFitter::InitRun(PHCompositeNode* topNode)
     }
     else
     {
-      ntp = new TNtuple("ntp", "HF ntuple", "event:trkid:layer:nsilicon:ntpc:nclus:trkrid:sector:side:subsurf:phi:glbl0:glbl1:glbl2:glbl3:glbl4:glbl5:sensx:sensy:sensz:normx:normy:normz:sensxideal:sensyideal:senszideal:normxideal:normyideal:normzideal:xglobideal:yglobideal:zglobideal:R:X0:Y0:Zs:Z0:xglob:yglob:zglob:xfit:yfit:zfit:pcax:pcay:pcaz:tangx:tangy:tangz:X:Y:fitX:fitY:dXdR:dXdX0:dXdY0:dXdZs:dXdZ0:dXdalpha:dXdbeta:dXdgamma:dXdx:dXdy:dXdz:dYdR:dYdX0:dYdY0:dYdZs:dYdZ0:dYdalpha:dYdbeta:dYdgamma:dYdx:dYdy:dYdz");
+      ntp = new TNtuple (
+        "ntp", "HF ntuple",
+        "event:trkid:"
+        "layer:nsilicon:ntpc:nclus:trkrid:sector:side:"
+        "subsurf:phi:"
+        "glbl0:glbl1:glbl2:glbl3:glbl4:glbl5:"
+        "sensx:sensy:sensz:"
+        "normx:normy:normz:"
+        "sensxideal:sensyideal:senszideal:"
+        "normxideal:normyideal:normzideal:"
+        "xglobideal:yglobideal:zglobideal:"
+        "R:X0:Y0:Zs:Z0:"
+        "xglob:yglob:zglob:"
+        "xfit:yfit:zfit:"
+        "pcax:pcay:pcaz:"
+        "tangx:tangy:tangz:"
+        "X:Y:fitX:fitY:"
+        "X_residual:Y_residual:"
+        "dXdR:dXdX0:dXdY0:dXdZs:dXdZ0:"
+        "dXdalpha:dXdbeta:dXdgamma:dXdx:dXdy:dXdz:"
+        "dYdR:dYdX0:dYdY0:dYdZs:dYdZ0:"
+        "dYdalpha:dYdbeta:dYdgamma:dYdx:dYdy:dYdz"
+      );
     }
 
     if (straight_line_fit)
@@ -181,7 +203,7 @@ void HelicalFitter::SetDefaultParameters()
 }
 
 //____________________________________________________________________________..
-int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
+int HelicalFitter::process_event(PHCompositeNode* topNode)
 {
   // _track_map_tpc contains the TPC seed track stubs
   // _track_map_silicon contains the silicon seed track stubs
@@ -203,6 +225,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
     }
   }
 
+  
   if (fitsilicon && _track_map_silicon != nullptr)
   {
     if (_track_map_silicon->size() == 0)
@@ -250,6 +273,10 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
   {
     maxtracks = _track_map_silicon->size();
   }
+
+  SvtxTrackMap* track_map = findNode::getClass<SvtxTrackMap>(topNode, "SvtxTrackMap");
+  SvtxAlignmentStateMap* state_map = findNode::getClass<SvtxAlignmentStateMap>(topNode, "SvtxAlignmentStateMap");
+
   for (unsigned int trackid = 0; trackid < maxtracks; ++trackid)
   {
     TrackSeed* tracklet = nullptr;
@@ -264,6 +291,79 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
     if (!tracklet)
     {
       continue;
+    }
+
+    // Require a corresponding state exists on state_map (18 lines up)
+    if (m_require_state) {
+
+      // Require this tracklet has an existing ACTS state
+      bool tracklet_has_state = true;
+
+      // Only check tracks for states that exist
+      for (auto [key, statevec] : *state_map) {
+        auto track_map_itr = track_map->find(key);
+        if (track_map_itr == track_map->end()) continue;
+        SvtxTrack* track = track_map_itr->second;
+
+        // For every cluster in the tracklet, see if a particular track has the cluster
+        tracklet_has_state = true;
+        for (
+          TrackSeed::ConstClusterKeyIter tracklet_cluskey_itr = tracklet->begin_cluster_keys();
+          tracklet_cluskey_itr != tracklet->end_cluster_keys();
+          ++tracklet_cluskey_itr
+        ) {
+            if (track->find_cluster_key(*tracklet_cluskey_itr) != track->end_cluster_keys()) continue;
+
+            // If any one cluster is not accounted for, this track/state doesn't subtend the tracklet
+            tracklet_has_state = false;
+            break;
+        }
+
+        // If we've found a single track/state that contains the tracklet, successful
+        if (tracklet_has_state) break;
+      }
+
+      if (!tracklet_has_state) continue;
+    }
+
+    if (m_silicon_only) {
+      // Require 3 MVTX states, 2 INTT states, and 0 other
+      if (tracklet->size_cluster_keys() != 5) {
+          if (1 < Verbosity()) {
+              std::cout
+                  << PHWHERE << "\n"
+                  << "\tSkipping due to excess clusters\n"
+                  << "\ttracklet clusters: " << tracklet->size_cluster_keys() << " ?= 3\n"
+                  << std::endl;
+          }
+          continue;
+      }
+
+      int n_mvtx{0}, n_intt{0};
+      for (TrackSeed::ConstClusterKeyIter ckey_itr = tracklet->begin_cluster_keys(); ckey_itr != tracklet->end_cluster_keys(); ++ckey_itr) {
+        TrkrDefs::cluskey ckey = *ckey_itr;
+        const unsigned int trkr_id = TrkrDefs::getTrkrId(ckey);
+        switch (trkr_id) {
+          case TrkrDefs::mvtxId:
+            ++n_mvtx;
+            break;
+          case TrkrDefs::inttId:
+            ++n_intt;
+            break;
+        }
+      }
+
+      if (n_mvtx < 3 || n_intt < 2) {
+          if (1 < Verbosity()) {
+              std::cout
+                  << PHWHERE << "\n"
+                  << "\tSkipping due to failed silicon requirements\n"
+                  << "\tmvtx: " << n_mvtx << " ?= 3\n"
+                  << "\tintt: " << n_intt << " ?= 2\n"
+                  << std::endl;
+          }
+          continue;
+      }
     }
 
     std::vector<Acts::Vector3> global_vec;
@@ -520,6 +620,10 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
       continue;
     }
     if (fabs(newTrack.get_eta()) > m_eta_cut)
+    {
+      continue;
+    }
+    if (fabs(newTrack.get_pt()) < m_min_pt)
     {
       continue;
     }
@@ -826,7 +930,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
         }
         else
         {
-          float ntp_data[75] = {
+          float ntp_data[] = {
               (float) event, (float) trackid,
               (float) layer, (float) nsilicon, (float) ntpc, (float) nclus, (float) trkrid, (float) sector, (float) side,
               (float) subsurf, phi,
@@ -842,6 +946,7 @@ int HelicalFitter::process_event(PHCompositeNode* /*unused*/)
               (float) tangent.first.x(), (float) tangent.first.y(), (float) tangent.first.z(),
               (float) tangent.second.x(), (float) tangent.second.y(), (float) tangent.second.z(),
               xloc, zloc, (float) fitpoint_local(0), (float) fitpoint_local(1),
+              (float)residual(0), (float)residual(1),
               lcl_derivativeX[0], lcl_derivativeX[1], lcl_derivativeX[2], lcl_derivativeX[3], lcl_derivativeX[4],
               glbl_derivativeX[0], glbl_derivativeX[1], glbl_derivativeX[2], glbl_derivativeX[3], glbl_derivativeX[4], glbl_derivativeX[5],
               lcl_derivativeY[0], lcl_derivativeY[1], lcl_derivativeY[2], lcl_derivativeY[3], lcl_derivativeY[4],
