@@ -267,12 +267,12 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
   if (fittpc && _track_map_tpc != nullptr)
   {
-    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _track_map_tpc << "\n" << std::endl;
+    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _track_map_name << "\n" << std::endl;
     maxtracks = _track_map_tpc->size();
   }
   if (fitsilicon && _track_map_silicon != nullptr)
   {
-    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _track_map_silicon << "\n" << std::endl;
+    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _silicon_track_map_name << "\n" << std::endl;
     maxtracks = _track_map_silicon->size();
   }
 
@@ -284,16 +284,17 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
     TrackSeed* tracklet = nullptr;
     if (fitsilicon && _track_map_silicon != nullptr)
     {
-      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _track_map_silicon << "\n" << std::endl;
+      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _silicon_track_map_name << "\n" << std::endl;
       tracklet = _track_map_silicon->get(trackid);
     }
     else if (fittpc && _track_map_tpc != nullptr)
     {
-      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _track_map_tpc << "\n" << std::endl;
+      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _track_map_name << "\n" << std::endl;
       tracklet = _track_map_tpc->get(trackid);
     }
     if (!tracklet)
     {
+	  if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
       continue;
     }
 
@@ -373,7 +374,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
       }
     }
 
-	std::cout << PHWHERE << " made it to here" << std::endl;
+	if (1 < Verbosity()) std::cout << PHWHERE << " made it to here" << std::endl;
 
     std::vector<Acts::Vector3> global_vec;
     std::vector<TrkrDefs::cluskey> cluskey_vec;
@@ -382,6 +383,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
     getTrackletClusterList(tracklet, cluskey_vec);
     if (cluskey_vec.size() < 3)
     {
+	  if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
       continue;
     }
     int nintt = 0;
@@ -412,6 +414,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
       }
       if (fitpars.size() == 0)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;  // discard this track, not enough clusters to fit
       }
 
@@ -425,10 +428,12 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
     {
       if (fitsilicon && nintt < 2)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;  // discard incomplete seeds
       }
       if (fabs(tracklet->get_eta()) > m_eta_cut)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;
       }
 
@@ -436,6 +441,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
       if (fitpars.size() == 0)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;  // discard this track, not enough clusters to fit
       }
 
@@ -476,6 +482,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
       if (nsilicon < 5)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;  // discard this TPC seed, did not get a good match to silicon
       }
       auto trackseed = std::make_unique<TrackSeed_v2>();
@@ -500,6 +507,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
         fitpars_mvtx_half = TrackFitUtils::fitClustersZeroField(global_vec, cluskey_vec, use_intt_zfit, mvtx_east_only, mvtx_west_only);
         if (fitpars.size() == 0)
         {
+	      if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
           continue;  // discard this track, not enough clusters to fit
         }
 
@@ -510,6 +518,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
         }
         if (fabs(tracklet->get_eta()) > m_eta_cut)
         {
+	      if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
           continue;
         }
       }
@@ -519,6 +528,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
         if (fitpars.size() == 0)
         {
+	      if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
           continue;  // discard this track, fit failed
         }
 
@@ -681,6 +691,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
       if (!cluster)
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;
       }
 
@@ -780,6 +791,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
       Acts::Vector2 clus_sigma = getClusterError(cluster, cluskey, global);
       if (isnan(clus_sigma(0)) || isnan(clus_sigma(1)))
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;
       }
 
@@ -798,6 +810,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
       }
       else
       {
+	    if (1 < Verbosity()) std::cout << PHWHERE << " continue here" << std::endl;
         continue;
       }
 
