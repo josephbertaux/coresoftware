@@ -98,13 +98,8 @@ int HelicalFitter::InitRun(PHCompositeNode* topNode)
 {
   UpdateParametersWithMacro();
 
-  int ret = GetNodes(topNode);
-  if (ret != Fun4AllReturnCodes::EVENT_OK)
-  {
-    return ret;
-  }
 
-  ret = CreateNodes(topNode);
+  int ret = CreateNodes(topNode);
   if (ret != Fun4AllReturnCodes::EVENT_OK)
   {
     return ret;
@@ -208,6 +203,12 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
   // _track_map_tpc contains the TPC seed track stubs
   // _track_map_silicon contains the silicon seed track stubs
   // _svtx_seed_map contains the combined silicon and tpc track seeds
+
+  int ret = GetNodes(topNode);
+  if (ret != Fun4AllReturnCodes::EVENT_OK)
+  {
+    return ret;
+  }
 
   event++;
 
@@ -927,6 +928,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
               glbl_derivativeY[0], glbl_derivativeY[1], glbl_derivativeY[2], glbl_derivativeY[3], glbl_derivativeY[4], glbl_derivativeY[5]};
 
           ntp->Fill(ntp_data);
+          if (1 < Verbosity()) std::cout << PHWHERE << "\n\tFilled ntp with straight line fit data\n" << std::endl;
         }
         else
         {
@@ -953,6 +955,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
               glbl_derivativeY[0], glbl_derivativeY[1], glbl_derivativeY[2], glbl_derivativeY[3], glbl_derivativeY[4], glbl_derivativeY[5]};
 
           ntp->Fill(ntp_data);
+          if (1 < Verbosity()) std::cout << PHWHERE << "\n\tFilled track_ntp with helix fit data\n" << std::endl;
 
           if (Verbosity() > 2)
           {
@@ -1156,6 +1159,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
                               (float) event_vtx(0), (float) event_vtx(1), (float) event_vtx(2), track_phi, perigee_phi, track_eta};
 
         track_ntp->Fill(ntp_data);
+        if (1 < Verbosity()) std::cout << PHWHERE << "\n\tFilled track_ntp with straight line fit data\n" << std::endl;
       }
       else
       {
@@ -1168,6 +1172,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
                               (float) event_vtx(0), (float) event_vtx(1), (float) event_vtx(2), track_phi, perigee_phi};
 
         track_ntp->Fill(ntp_data);
+        if (1 < Verbosity()) std::cout << PHWHERE << "\n\tFilled track_ntp with helix fit data\n" << std::endl;
       }
 
     }
@@ -1488,7 +1493,7 @@ int HelicalFitter::GetNodes(PHCompositeNode* topNode)
   _track_map_silicon = findNode::getClass<TrackSeedContainer>(topNode, _silicon_track_map_name);
   if (!_track_map_silicon && (fitsilicon || fitfulltrack))
   {
-    cerr << PHWHERE << " ERROR: Can't find SiliconTrackSeedContainer " << endl;
+    cerr << PHWHERE << " ERROR: Can't find " << _silicon_track_map_name << endl;
     return Fun4AllReturnCodes::ABORTEVENT;
   }
 
