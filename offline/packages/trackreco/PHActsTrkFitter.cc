@@ -1271,11 +1271,11 @@ int PHActsTrkFitter::createNodes(PHCompositeNode* topNode)
     svtxNode->addNode(node);
   }
 
-  m_alignmentStateMap = findNode::getClass<SvtxAlignmentStateMap>(topNode, "SvtxAlignmentStateMap");
+  m_alignmentStateMap = findNode::getClass<SvtxAlignmentStateMap>(topNode, _alignment_state_map_name);
   if (!m_alignmentStateMap)
   {
     m_alignmentStateMap = new SvtxAlignmentStateMap_v1;
-    auto node = new PHDataNode<SvtxAlignmentStateMap>(m_alignmentStateMap, "SvtxAlignmentStateMap", "PHObject");
+    auto node = new PHDataNode<SvtxAlignmentStateMap>(m_alignmentStateMap, _alignment_state_map_name, "PHObject");
     svtxNode->addNode(node);
   }
 
