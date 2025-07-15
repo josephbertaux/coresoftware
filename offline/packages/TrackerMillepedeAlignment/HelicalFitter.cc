@@ -122,7 +122,6 @@ int HelicalFitter::InitRun(PHCompositeNode* topNode)
 
   if (make_ntuple)
   {
-    // fout = new TFile("HF_ntuple.root","recreate");
     fout = new TFile(ntuple_outfilename.c_str(), "recreate");
     if (straight_line_fit)
     {
@@ -268,10 +267,12 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
   if (fittpc && _track_map_tpc != nullptr)
   {
+    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _track_map_tpc << "\n" << std::endl;
     maxtracks = _track_map_tpc->size();
   }
   if (fitsilicon && _track_map_silicon != nullptr)
   {
+    if (1 < Verbosity()) std::cout << PHWHERE << "\n\tAssigning maxtracks from " << _track_map_silicon << "\n" << std::endl;
     maxtracks = _track_map_silicon->size();
   }
 
@@ -283,10 +284,12 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
     TrackSeed* tracklet = nullptr;
     if (fitsilicon && _track_map_silicon != nullptr)
     {
+      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _track_map_silicon << "\n" << std::endl;
       tracklet = _track_map_silicon->get(trackid);
     }
     else if (fittpc && _track_map_tpc != nullptr)
     {
+      if (1 < Verbosity()) std::cout << "\t\tAssigning tracklet from " << _track_map_tpc << "\n" << std::endl;
       tracklet = _track_map_tpc->get(trackid);
     }
     if (!tracklet)
@@ -324,7 +327,10 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
         if (tracklet_has_state) break;
       }
 
-      if (!tracklet_has_state) continue;
+      if (!tracklet_has_state) {
+		  if (1 < Verbosity()) std::cout << "Continuing since tracklet has no corresponding alignment state" << std::endl;
+		  continue;
+	  }
     }
 
     if (m_silicon_only) {
@@ -366,6 +372,8 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
           continue;
       }
     }
+
+	std::cout << PHWHERE << " made it to here" << std::endl;
 
     std::vector<Acts::Vector3> global_vec;
     std::vector<TrkrDefs::cluskey> cluskey_vec;
@@ -1177,7 +1185,7 @@ int HelicalFitter::process_event(PHCompositeNode* topNode)
 
     }
 
-    if (Verbosity() > 1)
+    if (1 < Verbosity())
     {
       std::cout << "vtx_residual xy: " << vtx_residual(0) << " vtx_residual z: " << vtx_residual(1) << " vtx_sigma xy: " << vtx_sigma(0) << " vtx_sigma z: " << vtx_sigma(1) << std::endl;
       std::cout << "track_x " << newTrack.get_x() << "track_y " << newTrack.get_y() << "track_z " << newTrack.get_z() << std::endl;
