@@ -1442,16 +1442,8 @@ Acts::Vector3 HelicalFitter::getPCALinePoint(const Acts::Vector3& global, const 
 float HelicalFitter::convertTimeToZ(TrkrDefs::cluskey cluster_key, TrkrCluster* cluster)
 {
   // must convert local Y from cluster average time of arival to local cluster z position
-  double const drift_velocity = _tGeometry->get_drift_velocity();
-  double const zdriftlength = cluster->getLocalY() * drift_velocity;
-  double const surfCenterZ = 52.89;          // 52.89 is where G4 thinks the surface center is
-  double zloc = surfCenterZ - zdriftlength;  // converts z drift length to local z position in the TPC in north
-  unsigned int const side = TpcDefs::getSide(cluster_key);
-  if (side == 0)
-  {
-    zloc = -zloc;
-  }
-  float const z = zloc;  // in cm
+  Acts::Vector2 local = _tGeometry->getLocalCoords(cluster_key, cluster);
+  float z = local(1);
 
   return z;
 }

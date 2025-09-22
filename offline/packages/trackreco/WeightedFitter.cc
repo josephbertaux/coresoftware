@@ -492,25 +492,13 @@ WeightedFitter::modify_point_tpc (
 	TrkrCluster* cluster,
 	WeightedFitter::ClusterFitPoint& point
 ) {
-	// See HelicalFitter::convertTimeToZ
-
-	// must convert local Y from cluster average time of arival to local cluster z position
-	double const drift_velocity = m_geometry->get_drift_velocity();
-	double const zdriftlength = cluster->getLocalY() * drift_velocity;
-	double const surfCenterZ = 52.89;          // 52.89 is where G4 thinks the surface center is
-	double zloc = surfCenterZ - zdriftlength;  // converts z drift length to local z position in the TPC in north
-	unsigned int const side = TpcDefs::getSide(cluster_key);
-	if (side == 0)
-	{
-	  zloc = -zloc;
-	}
-	point.pos.z() = zloc;  // in cm
+	point.pos.z() = m_geometry->getLocalCoords(cluster_key, cluster)(1);
 
 	// See HelicalFitter::makeTpcGlobalCorrections
-
-	// make all corrections to global position of TPC cluster
-	// crossing argument is set to 0 (in HelicalFitter implementation)
-	// TODO: maybe retrieve from cluster later?
+	//  make all corrections to global position of TPC cluster
+	//  crossing argument is set to 0 (in HelicalFitter implementation)
+	//  TODO: maybe retrieve from cluster later?
+	unsigned int const side = TpcDefs::getSide(cluster_key);
 	point.pos.z() = m_clusterCrossingCorrection.correctZ(point.pos.z(), side, 0);
 
 	// apply distortion corrections
