@@ -15,7 +15,7 @@
 #include <trackbase_historic/SvtxAlignmentStateMap_v1.h>
 #include <trackbase_historic/SvtxTrack_v4.h>
 #include <trackbase_historic/SvtxTrackMap_v2.h>
-#include <trackbase_historic/SvtxTrackState_v1.h>
+#include <trackbase_historic/SvtxTrackState_v3.h>
 #include <trackbase_historic/SvtxTrackSeed_v1.h>
 #include <trackbase_historic/SvtxTrackSeed_v2.h>
 #include <trackbase_historic/TrackSeed.h>
@@ -571,13 +571,34 @@ WeightedFitter::add_track (
 	for (auto const& point : m_output_cluster_fit_points) {
 		Acts::Vector3 intersection = m_weighted_track->get_intersection(point.sensor_local_to_global_transform);
 
-		SvtxTrackState_v1 svtx_track_state(intersection.norm());
+		SvtxTrackState_v3 svtx_track_state(intersection.norm());
+		svtx_track_state.set_name(std::to_string(point.cluster_key));
+		svtx_track_state.set_cluskey(point.cluster_key);
 		svtx_track_state.set_x(intersection(0));
 		svtx_track_state.set_y(intersection(1));
 		svtx_track_state.set_z(intersection(2));
 		svtx_track_state.set_px(slope(0));
 		svtx_track_state.set_py(slope(1));
 		svtx_track_state.set_pz(slope(2));
+
+		// use the cluster uncertainties, rotated into global coordiantes, as the track state errors
+		// can add the uncertainties in track parameters later but these are negligible in magnitude by comparison
+		Eigen::Affine3d covariance = Eigen::Affine3d::Identity();
+		covariance(0, 0) = point.cluster_errors(0);
+		covariance(1, 1) = point.cluster_errors(1);
+		covariance(2, 2) = 0;
+		covariance = point.sensor_local_to_global_transform * covariance * point.sensor_local_to_global_transform.inverse();
+		for (int i = 0; i < 6; ++i) {
+			for (int j = 0; j < 6; ++j) {
+				// use the rotated cluster uncertainties for the spatial component
+				// (these seem to be indices 0, 1, 2 judging by a comment in ActsTransformations.cc:187
+				if (i < 3 && j < 3) {
+					svtx_track_state.set_error(i, j, covariance.rotation()(i, j));
+				} else {
+					svtx_track_state.set_error(i, j, 0);
+				}
+			}
+		}
 		fitted_track.insert_state(&svtx_track_state);
 
 		auto alignment_state = std::make_unique<SvtxAlignmentState_v1>();
